@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, ReactNode } from 'react';
+import { createContext, useContext, useState, useRef, ReactNode } from 'react';
 import { DIAGNOSIS_QUESTIONS, computeRecommendations } from '@/lib/constants';
 import type { DiagnosisAnswerInput } from '@/lib/constants';
 
@@ -11,6 +11,7 @@ interface DiagnosisState {
   answers: DiagnosisAnswerInput[];
   recommendedProducts: string[];
   selectedBenefit: BenefitType | null;
+  toast: string | null;
   setAnswer: (questionId: number, answerIndex: number) => void;
   goNext: () => void;
   selectBenefit: (benefit: BenefitType) => void;
@@ -18,6 +19,7 @@ interface DiagnosisState {
   backToGate: () => void;         // 주소 입력 → 혜택 선택으로 돌아가기
   reset: () => void;
   scrollToQuiz: () => void;
+  showToast: (message: string, duration?: number) => void;
   registerScrollRef: (el: HTMLElement | null) => void;
 }
 
@@ -29,7 +31,9 @@ export function DiagnosisProvider({ children }: { children: ReactNode }) {
   const [answers, setAnswers] = useState<DiagnosisAnswerInput[]>([]);
   const [recommendedProducts, setRecommendedProducts] = useState<string[]>([]);
   const [selectedBenefit, setSelectedBenefit] = useState<BenefitType | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
   const [quizRef, setQuizRef] = useState<HTMLElement | null>(null);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   function registerScrollRef(el: HTMLElement | null) {
     setQuizRef(el);
@@ -73,6 +77,12 @@ export function DiagnosisProvider({ children }: { children: ReactNode }) {
     setStep('gate');
   }
 
+  function showToast(message: string, duration = 3000) {
+    setToast(message);
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = setTimeout(() => setToast(null), duration);
+  }
+
   function reset() {
     setStep('quiz');
     setCurrentQuestion(0);
@@ -83,9 +93,9 @@ export function DiagnosisProvider({ children }: { children: ReactNode }) {
 
   return (
     <DiagnosisContext.Provider value={{
-      step, currentQuestion, answers, recommendedProducts, selectedBenefit,
+      step, currentQuestion, answers, recommendedProducts, selectedBenefit, toast,
       setAnswer, goNext, selectBenefit, completeLogin, backToGate, reset,
-      scrollToQuiz, registerScrollRef,
+      scrollToQuiz, showToast, registerScrollRef,
     }}>
       {children}
     </DiagnosisContext.Provider>
