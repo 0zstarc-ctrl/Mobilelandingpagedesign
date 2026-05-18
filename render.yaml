@@ -1,0 +1,86 @@
+## Pick & Pill — Render.com 배포 설정
+## https://render.com/docs/blueprint-spec
+
+services:
+  # ── 1. 프론트엔드 (React SPA) ──────────────────────────────
+  - type: web
+    name: picknpill-frontend
+    runtime: static
+    buildCommand: npm install && npm run build
+    staticPublishPath: ./dist
+    pullRequestPreviewsEnabled: true
+    headers:
+      # SPA 라우팅을 위해 모든 경로를 index.html 로 fallback
+      - path: /*
+        name: X-Frame-Options
+        value: DENY
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: VITE_SUPABASE_URL
+        sync: false          # Render 대시보드에서 직접 입력
+      - key: VITE_SUPABASE_ANON_KEY
+        sync: false
+      - key: VITE_KAKAO_JS_KEY
+        sync: false
+      - key: VITE_IMP_CODE
+        sync: false
+      - key: VITE_APP_URL
+        sync: false
+
+  # ── 2. 백엔드 API (Node.js) ────────────────────────────────
+  # Phase 1에서 백엔드 서버 구축 후 활성화
+  # - type: web
+  #   name: picknpill-api
+  #   runtime: node
+  #   buildCommand: npm install
+  #   startCommand: node server/index.js
+  #   plan: starter              # Cold Start 방지 ($7/월)
+  #   envVars:
+  #     - key: NODE_ENV
+  #       value: production
+  #     - key: SUPABASE_URL
+  #       sync: false
+  #     - key: SUPABASE_SERVICE_ROLE_KEY
+  #       sync: false            # 절대 클라이언트에 노출 금지
+  #     - key: KAKAO_REST_API_KEY
+  #       sync: false
+  #     - key: KAKAO_REDIRECT_URI
+  #       sync: false
+  #     - key: IMP_KEY
+  #       sync: false
+  #     - key: IMP_SECRET
+  #       sync: false
+  #     - key: SOLAPI_API_KEY
+  #       sync: false
+  #     - key: SOLAPI_API_SECRET
+  #       sync: false
+  #     - key: KAKAO_CHANNEL_ID
+  #       sync: false
+  #     - key: SESSION_SECRET
+  #       sync: false
+
+  # ── 3. CRM 배치 스케줄러 ────────────────────────────────────
+  # Phase 3에서 활성화 (D+7/25/60 알림톡 자동 발송)
+  # - type: cron
+  #   name: picknpill-crm-scheduler
+  #   runtime: node
+  #   schedule: "0 10 * * *"    # 매일 오전 10시 (KST = UTC+9, 즉 UTC 01:00)
+  #   buildCommand: npm install
+  #   startCommand: node server/jobs/crm-scheduler.js
+  #   envVars:
+  #     - key: SUPABASE_URL
+  #       sync: false
+  #     - key: SUPABASE_SERVICE_ROLE_KEY
+  #       sync: false
+  #     - key: SOLAPI_API_KEY
+  #       sync: false
+  #     - key: SOLAPI_API_SECRET
+  #       sync: false
+  #     - key: KAKAO_CHANNEL_ID
+  #       sync: false
