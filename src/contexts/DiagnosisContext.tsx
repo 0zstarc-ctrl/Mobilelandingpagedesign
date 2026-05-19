@@ -106,7 +106,7 @@ export function DiagnosisProvider({ children }: { children: ReactNode }) {
     url.searchParams.set('client_id', clientId);
     url.searchParams.set('redirect_uri', redirectUri);
     url.searchParams.set('response_type', 'code');
-    url.searchParams.set('scope', 'profile_nickname,gender,age_range');
+    url.searchParams.set('scope', 'profile_nickname');
 
     window.location.href = url.toString();
   }
