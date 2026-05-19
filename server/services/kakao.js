@@ -14,6 +14,13 @@ async function getAccessToken(code) {
     ...(KAKAO_CLIENT_SECRET ? { client_secret: KAKAO_CLIENT_SECRET } : {}),
   });
 
+  console.log('[kakao] token 요청 파라미터:', {
+    grant_type: 'authorization_code',
+    client_id: KAKAO_REST_API_KEY,
+    redirect_uri: KAKAO_REDIRECT_URI,
+    code_length: code?.length,
+  });
+
   const res = await fetch(TOKEN_URL, {
     method:  'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -22,6 +29,7 @@ async function getAccessToken(code) {
 
   if (!res.ok) {
     const body = await res.json();
+    console.log('[kakao] token 실패 전체 응답:', JSON.stringify(body));
     throw new Error(`카카오 토큰 오류: ${body.error_description ?? body.error}`);
   }
 
