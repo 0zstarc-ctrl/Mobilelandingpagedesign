@@ -27,6 +27,8 @@ services:
         sync: false
       - key: VITE_KAKAO_JS_KEY
         sync: false
+      - key: VITE_KAKAO_REST_API_KEY
+        sync: false
       - key: VITE_IMP_CODE
         sync: false
       - key: VITE_APP_URL

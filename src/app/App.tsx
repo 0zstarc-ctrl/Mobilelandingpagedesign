@@ -18,6 +18,8 @@ import {
 import { DiagnosisProvider, useDiagnosis } from '@/contexts/DiagnosisContext';
 import { DIAGNOSIS_QUESTIONS, PRODUCT_INFO } from '@/lib/constants';
 import { useRefParam } from '@/lib/hooks/useRefParam';
+import { submitSampleRequest } from '@/lib/api';
+import KakaoCallback from '@/pages/KakaoCallback';
 
 // ─── 정적 데이터 ──────────────────────────────────────────────
 
@@ -155,7 +157,7 @@ function DiagnosisSection() {
 // ─── 로그인 게이트 모달 ───────────────────────────────────────
 
 function LoginGateModal() {
-  const { step, selectedBenefit, selectBenefit, completeLogin, reset } = useDiagnosis();
+  const { step, selectedBenefit, selectBenefit, startKakaoLogin, reset } = useDiagnosis();
   if (step !== 'gate') return null;
 
   return (
@@ -203,7 +205,7 @@ function LoginGateModal() {
         </div>
 
         <button
-          onClick={completeLogin}
+          onClick={() => selectedBenefit && startKakaoLogin(selectedBenefit)}
           disabled={!selectedBenefit}
           className="w-full flex items-center justify-center gap-2 bg-[#FEE500] text-[#371D1E] py-4 rounded-xl font-bold hover:bg-[#f4db00] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
         >
@@ -224,7 +226,7 @@ function LoginGateModal() {
 // ─── 샘플팩 주소 입력 모달 ────────────────────────────────────
 
 function SampleRequestModal() {
-  const { step, completeLogin, backToGate } = useDiagnosis();
+  const { step, completeLogin, backToGate, showToast } = useDiagnosis();
   const [form, setForm] = useState({ name: '', phone: '', address: '', addressSub: '', zipcode: '' });
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
@@ -250,14 +252,26 @@ function SampleRequestModal() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
-    await new Promise(r => setTimeout(r, 800));
-    setLoading(false);
-    setDone(true);
-    setTimeout(() => {
-      completeLogin();
-      setDone(false);
-      setForm({ name: '', phone: '', address: '', addressSub: '', zipcode: '' });
-    }, 2000);
+    try {
+      await submitSampleRequest({
+        name: form.name,
+        phone: form.phone,
+        address: form.address,
+        addressSub: form.addressSub || undefined,
+        zipcode: form.zipcode,
+      });
+      setDone(true);
+      setTimeout(() => {
+        completeLogin();
+        setDone(false);
+        setForm({ name: '', phone: '', address: '', addressSub: '', zipcode: '' });
+      }, 2500);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : '샘플팩 신청 중 오류가 발생했습니다.';
+      showToast(message);
+    } finally {
+      setLoading(false);
+    }
   }
 
   if (done) {
@@ -448,6 +462,11 @@ function usePurchaseAction() {
 
 export default function App() {
   useRefParam();
+
+  // 카카오 OAuth 콜백 경로 처리
+  if (window.location.pathname === '/auth/kakao/callback') {
+    return <KakaoCallback />;
+  }
 
   return (
     <DiagnosisProvider>
