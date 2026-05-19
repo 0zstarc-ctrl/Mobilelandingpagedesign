@@ -106,7 +106,7 @@ export function DiagnosisProvider({ children }: { children: ReactNode }) {
     url.searchParams.set('client_id', clientId);
     url.searchParams.set('redirect_uri', redirectUri);
     url.searchParams.set('response_type', 'code');
-    // scope는 카카오 앱 동의항목 설정 후 추가 (현재는 기본값 사용)
+    url.searchParams.set('scope', 'profile_nickname');
 
     window.location.href = url.toString();
   }
