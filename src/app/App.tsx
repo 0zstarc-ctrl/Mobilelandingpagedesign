@@ -214,7 +214,7 @@ type DiagnosisResult = {
 };
 
 type CustomerSyncStatus = 'idle' | 'syncing' | 'synced' | 'failed';
-type PaymentMethod = 'kakao_pay' | 'naver_pay' | 'card';
+type PaymentMethod = 'kakao_pay' | 'naver_pay' | 'card' | 'simple_pay';
 
 type PurchaseItem = {
   itemType: 'product' | 'set' | 'payment';
@@ -1342,6 +1342,23 @@ export default function App() {
               className="w-full md:flex-1 bg-transparent border-2 border-white/30 text-white py-4 md:py-5 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-white/10 transition-colors mt-2 md:mt-0 md:text-lg disabled:cursor-wait disabled:opacity-70"
             >
               <CreditCard className="w-5 h-5 md:w-6 md:h-6" /> 일반 신용카드
+            </button>
+            <button
+              onClick={() =>
+                startCheckout(
+                  {
+                    itemType: 'payment',
+                    itemId: 'quick-simple-pay',
+                    itemName: '간편결제 빠른 결제',
+                    price: '0',
+                  },
+                  'simple_pay',
+                )
+              }
+              disabled={isStartingCheckout}
+              className="w-full md:flex-1 bg-white text-[#1A7F5A] py-4 md:py-5 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-white/90 transition-colors mt-2 md:mt-0 md:text-lg disabled:cursor-wait disabled:opacity-70"
+            >
+              <CheckCircle2 className="w-5 h-5 md:w-6 md:h-6" /> 간편결제
             </button>
           </div>
           {checkoutMessage && (

@@ -82,7 +82,19 @@ create table if not exists public.orders (
   quantity integer not null default 1 check (quantity > 0),
   unit_price integer not null default 0 check (unit_price >= 0),
   total_amount integer not null default 0 check (total_amount >= 0),
-  payment_method text check (payment_method in ('kakao_pay', 'naver_pay', 'card')),
+  payment_method text check (
+    payment_method is null
+    or payment_method in (
+      'card',
+      'naver_pay',
+      'kakao_pay',
+      'simple_pay',
+      'toss_pay',
+      'payco',
+      'samsung_pay',
+      'apple_pay'
+    )
+  ),
   status text not null default 'checkout_started' check (status in ('checkout_started', 'pending_payment', 'paid', 'cancelled', 'failed')),
   metadata jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now(),

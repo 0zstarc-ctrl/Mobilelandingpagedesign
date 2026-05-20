@@ -51,6 +51,26 @@ Frontend should never:
 - Mark orders as paid.
 - Trust payment success from query parameters alone.
 
+### 3.1 Payment Method Coverage
+
+The production payment scope must include:
+
+- General PG card payment: `card`
+- Naver Pay: `naver_pay`
+- Kakao Pay: `kakao_pay`
+- Generic simple payment entry point: `simple_pay`
+- Optional PG-supported simple payment identifiers: `toss_pay`, `payco`, `samsung_pay`, `apple_pay`
+
+Recommended approach:
+
+- Use one primary PG contract when possible.
+- Enable Naver Pay and Kakao Pay through the PG if the chosen PG supports them.
+- Keep direct Naver Pay/Kakao Pay integration as a fallback only if fees, approval, or checkout UX require it.
+- Store the customer-facing choice in `orders.payment_method`.
+- Store the actual PG provider and transaction identifiers in `payments.provider`, `payments.pg_payment_id`, and `payments.pg_transaction_id`.
+
+This keeps reports stable even if the underlying PG provider changes later.
+
 ## 4. Core Tables
 
 ### 4.1 `orders`
