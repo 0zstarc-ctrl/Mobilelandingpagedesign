@@ -177,6 +177,14 @@ type DiagnosisResult = {
 };
 
 type CustomerSyncStatus = 'idle' | 'syncing' | 'synced' | 'failed';
+type PaymentMethod = 'kakao_pay' | 'naver_pay' | 'card';
+
+type PurchaseItem = {
+  itemType: 'product' | 'set' | 'payment';
+  itemId: string;
+  itemName: string;
+  price: string;
+};
 
 function formatCreatorName(slug?: string) {
   if (!slug) {
@@ -455,6 +463,10 @@ function readKakaoProfile(session: Session) {
   };
 }
 
+function parseWonAmount(price: string) {
+  return Number(price.replace(/[^\d]/g, '')) || 0;
+}
+
 export default function App() {
   const attribution = useAttribution();
   const { session, isAuthLoading } = useKakaoAuthSession();
@@ -467,6 +479,8 @@ export default function App() {
   const [authError, setAuthError] = useState<string | null>(null);
   const [landingCustomerId, setLandingCustomerId] = useState<string | null>(null);
   const [customerSyncStatus, setCustomerSyncStatus] = useState<CustomerSyncStatus>('idle');
+  const [checkoutMessage, setCheckoutMessage] = useState<string | null>(null);
+  const [isStartingCheckout, setIsStartingCheckout] = useState(false);
 
   const creatorName = useMemo(
     () => attribution?.creatorDisplayName || formatCreatorName(attribution?.creator),
@@ -590,6 +604,46 @@ export default function App() {
     });
     setIsSavingDiagnosis(false);
     setDiagnosisSaved(!error);
+  }
+
+  async function startCheckout(item: PurchaseItem, paymentMethod?: PaymentMethod) {
+    if (!supabase) {
+      setCheckoutMessage('주문 저장을 위해 Supabase 환경 설정이 필요합니다.');
+      return;
+    }
+
+    const unitPrice = parseWonAmount(item.price);
+
+    setIsStartingCheckout(true);
+    setCheckoutMessage(null);
+
+    const { error } = await supabase.from('orders').insert({
+      session_id: getSessionId(),
+      landing_customer_id: landingCustomerId,
+      creator_id: attribution?.creatorId,
+      campaign_id: attribution?.campaignId,
+      item_type: item.itemType,
+      item_id: item.itemId,
+      item_name: item.itemName,
+      quantity: 1,
+      unit_price: unitPrice,
+      total_amount: unitPrice,
+      payment_method: paymentMethod,
+      metadata: {
+        creator: attribution?.creator,
+        campaign: attribution?.campaign,
+        benefitLabel,
+      },
+    });
+
+    setIsStartingCheckout(false);
+
+    if (error) {
+      setCheckoutMessage('주문 준비 저장에 실패했습니다. 잠시 후 다시 시도해 주세요.');
+      return;
+    }
+
+    setCheckoutMessage('주문 준비가 저장되었습니다. 다음 단계에서 실제 결제창을 연결합니다.');
   }
 
   function handleDiagnosisAnswer(optionId: string) {
@@ -819,6 +873,20 @@ export default function App() {
                   </h3>
                   <p className="text-xs md:text-sm text-gray-500 mb-3 md:mb-4 line-clamp-1">{product.badge}</p>
                   <p className="font-bold text-lg md:text-xl mt-auto">{product.price}원</p>
+                  <button
+                    onClick={() =>
+                      startCheckout({
+                        itemType: 'product',
+                        itemId: String(product.id),
+                        itemName: product.name,
+                        price: product.price,
+                      })
+                    }
+                    disabled={isStartingCheckout}
+                    className="mt-4 w-full rounded-xl bg-[#1A7F5A] px-4 py-3 text-sm font-bold text-white transition-colors hover:bg-[#146648] disabled:cursor-wait disabled:opacity-70"
+                  >
+                    구매 준비하기
+                  </button>
                 </div>
               </div>
             ))}
@@ -847,12 +915,28 @@ export default function App() {
                   </div>
                   <p className="text-2xl md:text-3xl font-bold text-[#1A7F5A]">{set.price}원</p>
                 </div>
-                <button className="w-full bg-[#1C2B20] text-white py-4 rounded-xl text-sm md:text-base font-bold hover:bg-black transition-colors">
+                <button
+                  onClick={() =>
+                    startCheckout({
+                      itemType: 'set',
+                      itemId: String(set.id),
+                      itemName: set.name,
+                      price: set.price,
+                    })
+                  }
+                  disabled={isStartingCheckout}
+                  className="w-full bg-[#1C2B20] text-white py-4 rounded-xl text-sm md:text-base font-bold hover:bg-black transition-colors disabled:cursor-wait disabled:opacity-70"
+                >
                   세트 구매하기
                 </button>
               </div>
             ))}
           </div>
+          {checkoutMessage && (
+            <p className="mt-6 rounded-xl bg-white px-5 py-4 text-center text-sm font-semibold text-[#1A7F5A] shadow-sm">
+              {checkoutMessage}
+            </p>
+          )}
         </div>
       </section>
 
@@ -908,17 +992,64 @@ export default function App() {
           <p className="text-white/90 text-sm md:text-lg mb-10">{benefitLabel}</p>
 
           <div className="flex flex-col md:flex-row justify-center gap-3 md:gap-4 max-w-3xl mx-auto">
-            <button className="w-full md:flex-1 bg-[#FEE500] text-[#371D1E] py-4 md:py-5 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-[#f4db00] transition-colors md:text-lg">
+            <button
+              onClick={() =>
+                startCheckout(
+                  {
+                    itemType: 'payment',
+                    itemId: 'quick-kakao-pay',
+                    itemName: '카카오페이 빠른 결제',
+                    price: '0',
+                  },
+                  'kakao_pay',
+                )
+              }
+              disabled={isStartingCheckout}
+              className="w-full md:flex-1 bg-[#FEE500] text-[#371D1E] py-4 md:py-5 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-[#f4db00] transition-colors md:text-lg disabled:cursor-wait disabled:opacity-70"
+            >
               <MessageCircle className="w-5 h-5 md:w-6 md:h-6 fill-current" /> 카카오페이 결제
             </button>
-            <button className="w-full md:flex-1 bg-[#03C75A] text-white py-4 md:py-5 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-[#02b351] transition-colors md:text-lg">
+            <button
+              onClick={() =>
+                startCheckout(
+                  {
+                    itemType: 'payment',
+                    itemId: 'quick-naver-pay',
+                    itemName: '네이버페이 빠른 결제',
+                    price: '0',
+                  },
+                  'naver_pay',
+                )
+              }
+              disabled={isStartingCheckout}
+              className="w-full md:flex-1 bg-[#03C75A] text-white py-4 md:py-5 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-[#02b351] transition-colors md:text-lg disabled:cursor-wait disabled:opacity-70"
+            >
               <div className="w-5 h-5 md:w-6 md:h-6 font-black flex items-center justify-center text-lg md:text-xl">N</div>
               네이버페이 결제
             </button>
-            <button className="w-full md:flex-1 bg-transparent border-2 border-white/30 text-white py-4 md:py-5 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-white/10 transition-colors mt-2 md:mt-0 md:text-lg">
+            <button
+              onClick={() =>
+                startCheckout(
+                  {
+                    itemType: 'payment',
+                    itemId: 'quick-card',
+                    itemName: '일반 신용카드 빠른 결제',
+                    price: '0',
+                  },
+                  'card',
+                )
+              }
+              disabled={isStartingCheckout}
+              className="w-full md:flex-1 bg-transparent border-2 border-white/30 text-white py-4 md:py-5 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-white/10 transition-colors mt-2 md:mt-0 md:text-lg disabled:cursor-wait disabled:opacity-70"
+            >
               <CreditCard className="w-5 h-5 md:w-6 md:h-6" /> 일반 신용카드
             </button>
           </div>
+          {checkoutMessage && (
+            <p className="mx-auto mt-6 max-w-xl rounded-xl bg-white/10 px-5 py-4 text-sm font-semibold text-white">
+              {checkoutMessage}
+            </p>
+          )}
         </div>
       </section>
 
