@@ -29,6 +29,8 @@ The next backend milestone is to connect a PG provider and convert `orders.statu
 
 Use Supabase Edge Functions as the payment backend.
 
+Selected first integration direction: **PortOne-first**. See `PG_PROVIDER_DECISION.md` for the decision record, required secrets, and implementation plan.
+
 ```text
 Landing page
   -> create checkout session Edge Function
