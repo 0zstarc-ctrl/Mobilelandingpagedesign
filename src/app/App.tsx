@@ -238,6 +238,9 @@ type CreatorAdminReport = {
   paid_order_count: number;
   paid_quantity: number;
   paid_sales_amount: number;
+  commission_rate: number;
+  estimated_checkout_commission: number;
+  payable_commission: number;
   cancelled_or_failed_count: number;
 };
 
@@ -583,8 +586,10 @@ function AdminReports({
       diagnoses: acc.diagnoses + Number(report.diagnosis_count || 0),
       checkouts: acc.checkouts + Number(report.checkout_started_count || 0),
       paidAmount: acc.paidAmount + Number(report.paid_sales_amount || 0),
+      estimatedCommission: acc.estimatedCommission + Number(report.estimated_checkout_commission || 0),
+      payableCommission: acc.payableCommission + Number(report.payable_commission || 0),
     }),
-    { visits: 0, diagnoses: 0, checkouts: 0, paidAmount: 0 },
+    { visits: 0, diagnoses: 0, checkouts: 0, paidAmount: 0, estimatedCommission: 0, payableCommission: 0 },
   );
 
   return (
@@ -632,7 +637,7 @@ function AdminReports({
           </section>
         ) : (
           <>
-            <section className="grid grid-cols-2 gap-4 md:grid-cols-4">
+            <section className="grid grid-cols-2 gap-4 lg:grid-cols-6">
               <div className="rounded-2xl bg-white p-5 shadow-sm">
                 <p className="text-sm font-semibold text-gray-500">방문</p>
                 <p className="mt-2 text-3xl font-bold">{formatNumber(totals.visits)}</p>
@@ -648,6 +653,14 @@ function AdminReports({
               <div className="rounded-2xl bg-white p-5 shadow-sm">
                 <p className="text-sm font-semibold text-gray-500">결제 완료 금액</p>
                 <p className="mt-2 text-3xl font-bold">{formatNumber(totals.paidAmount)}원</p>
+              </div>
+              <div className="rounded-2xl bg-white p-5 shadow-sm">
+                <p className="text-sm font-semibold text-gray-500">예상 수수료</p>
+                <p className="mt-2 text-3xl font-bold">{formatNumber(totals.estimatedCommission)}원</p>
+              </div>
+              <div className="rounded-2xl bg-white p-5 shadow-sm">
+                <p className="text-sm font-semibold text-gray-500">정산 예정액</p>
+                <p className="mt-2 text-3xl font-bold text-[#1A7F5A]">{formatNumber(totals.payableCommission)}원</p>
               </div>
             </section>
 
@@ -670,8 +683,11 @@ function AdminReports({
                       <th className="px-4 py-3 text-right">진단</th>
                       <th className="px-4 py-3 text-right">주문 시작</th>
                       <th className="px-4 py-3 text-right">주문 시작 금액</th>
+                      <th className="px-4 py-3 text-right">수수료율</th>
+                      <th className="px-4 py-3 text-right">예상 수수료</th>
                       <th className="px-4 py-3 text-right">결제 완료</th>
                       <th className="px-4 py-3 text-right">결제 금액</th>
+                      <th className="px-4 py-3 text-right">정산 예정액</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
@@ -684,13 +700,16 @@ function AdminReports({
                         <td className="px-4 py-4 text-right">{formatNumber(report.diagnosis_count)}</td>
                         <td className="px-4 py-4 text-right">{formatNumber(report.checkout_started_count)}</td>
                         <td className="px-4 py-4 text-right">{formatNumber(report.checkout_started_amount)}원</td>
+                        <td className="px-4 py-4 text-right">{formatNumber(report.commission_rate)}%</td>
+                        <td className="px-4 py-4 text-right">{formatNumber(report.estimated_checkout_commission)}원</td>
                         <td className="px-4 py-4 text-right">{formatNumber(report.paid_order_count)}</td>
                         <td className="px-4 py-4 text-right font-bold text-[#1A7F5A]">{formatNumber(report.paid_sales_amount)}원</td>
+                        <td className="px-4 py-4 text-right font-bold text-[#1A7F5A]">{formatNumber(report.payable_commission)}원</td>
                       </tr>
                     ))}
                     {!isLoadingReports && reports.length === 0 && !reportError && (
                       <tr>
-                        <td colSpan={9} className="px-4 py-10 text-center text-gray-500">
+                        <td colSpan={12} className="px-4 py-10 text-center text-gray-500">
                           표시할 리포트가 없습니다.
                         </td>
                       </tr>

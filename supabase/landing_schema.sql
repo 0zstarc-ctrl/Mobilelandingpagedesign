@@ -612,6 +612,9 @@ returns table (
   paid_order_count bigint,
   paid_quantity numeric,
   paid_sales_amount numeric,
+  commission_rate numeric,
+  estimated_checkout_commission numeric,
+  payable_commission numeric,
   cancelled_or_failed_count bigint
 )
 language sql
@@ -632,13 +635,28 @@ as $$
     sales.checkout_started_amount,
     funnel.paid_order_count,
     sales.paid_quantity,
-    funnel.paid_sales_amount,
+    sales.paid_sales_amount,
+    coalesce(campaign_rule.commission_rate, creator_rule.commission_rate, 0) as commission_rate,
+    floor(coalesce(sales.checkout_started_amount, 0) * coalesce(campaign_rule.commission_rate, creator_rule.commission_rate, 0) / 100) as estimated_checkout_commission,
+    floor(coalesce(funnel.paid_sales_amount, 0) * coalesce(campaign_rule.commission_rate, creator_rule.commission_rate, 0) / 100) as payable_commission,
     sales.cancelled_or_failed_count
   from public.creator_monthly_funnel_report as funnel
   left join public.creator_monthly_sales_report as sales
     on sales.report_month = funnel.report_month
     and sales.creator_id = funnel.creator_id
     and sales.campaign_id is not distinct from funnel.campaign_id
+  left join public.creator_commission_rules as campaign_rule
+    on campaign_rule.creator_id = funnel.creator_id
+    and campaign_rule.campaign_id = funnel.campaign_id
+    and campaign_rule.status = 'active'
+    and (campaign_rule.starts_at is null or campaign_rule.starts_at <= (funnel.report_month + interval '1 month' - interval '1 second'))
+    and (campaign_rule.ends_at is null or campaign_rule.ends_at >= funnel.report_month)
+  left join public.creator_commission_rules as creator_rule
+    on creator_rule.creator_id = funnel.creator_id
+    and creator_rule.campaign_id is null
+    and creator_rule.status = 'active'
+    and (creator_rule.starts_at is null or creator_rule.starts_at <= (funnel.report_month + interval '1 month' - interval '1 second'))
+    and (creator_rule.ends_at is null or creator_rule.ends_at >= funnel.report_month)
   where private.is_landing_admin()
   order by funnel.report_month desc, funnel.creator_slug, funnel.campaign_code;
 $$;
@@ -662,6 +680,9 @@ returns table (
   paid_order_count bigint,
   paid_quantity numeric,
   paid_sales_amount numeric,
+  commission_rate numeric,
+  estimated_checkout_commission numeric,
+  payable_commission numeric,
   cancelled_or_failed_count bigint
 )
 language sql
