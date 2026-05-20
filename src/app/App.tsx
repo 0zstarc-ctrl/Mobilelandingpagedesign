@@ -479,7 +479,7 @@ export default function App() {
   const answeredCount = Object.keys(diagnosisAnswers).length;
   const isDiagnosisComplete = answeredCount === DIAGNOSIS_QUESTIONS.length;
   const isLoggedIn = Boolean(session);
-  const kakaoLoginLabel = isLoggedIn ? '로그인 완료' : isAuthLoading ? '로그인 확인 중' : '카카오 로그인';
+  const kakaoLoginLabel = isLoggedIn ? '카카오 연결됨' : isAuthLoading ? '로그인 확인 중' : '카카오 로그인';
 
   useEffect(() => {
     if (!supabase || !session) {
@@ -621,7 +621,7 @@ export default function App() {
             <button
               onClick={handleKakaoLogin}
               disabled={isLoggedIn || isAuthLoading}
-              className="flex items-center gap-1.5 bg-[#FEE500] text-[#371D1E] px-4 py-2 rounded-full text-sm font-semibold hover:bg-[#f4db00] transition-colors disabled:cursor-default disabled:opacity-80"
+              className="flex items-center gap-1.5 bg-[#FEE500] text-[#371D1E] px-4 py-2 rounded-full text-sm font-semibold hover:bg-[#f4db00] transition-colors disabled:cursor-default disabled:bg-[#FFF4A3] disabled:text-[#5A4B00]"
             >
               <MessageCircle className="w-4 h-4 fill-current" />
               {kakaoLoginLabel}
@@ -671,7 +671,7 @@ export default function App() {
               disabled={isLoggedIn || isAuthLoading}
               className="w-full sm:w-auto px-6 lg:px-8 bg-[#FEE500] text-[#371D1E] py-4 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-[#f4db00] transition-colors shadow-lg disabled:cursor-default disabled:opacity-80"
             >
-              <MessageCircle className="w-5 h-5 fill-current" /> {isLoggedIn ? '카카오 로그인 완료' : '카카오로 3초 만에 시작'}
+              <MessageCircle className="w-5 h-5 fill-current" /> {isLoggedIn ? '카카오 연결됨' : '카카오로 3초 만에 시작'}
             </button>
           </div>
         </div>
