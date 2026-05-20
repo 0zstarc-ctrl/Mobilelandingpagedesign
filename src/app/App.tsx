@@ -83,6 +83,43 @@ const SETS = [
   },
 ];
 
+const COMMERCE_NOTICES = [
+  {
+    title: '상품 정보 고시',
+    lines: ['제품명, 내용량, 원재료, 영양·기능 정보는 실제 판매 상품 확정 후 고시정보 기준으로 표시합니다.', '본 페이지의 이미지는 랜딩 검증용 예시이며, 최종 판매 전 실물 패키지와 표시사항을 반영합니다.'],
+  },
+  {
+    title: '섭취 및 주의사항',
+    lines: ['권장 섭취량과 섭취방법을 확인하고, 여러 건강기능식품을 함께 섭취할 때는 성분 중복을 확인하세요.', '질환 치료 중이거나 의약품을 복용 중인 경우 전문가와 상담 후 섭취하세요.'],
+  },
+  {
+    title: '배송 안내',
+    lines: ['평일 오전 결제 완료 건은 영업일 기준 순차 출고합니다.', '도서산간 지역은 추가 배송비 또는 배송 지연이 발생할 수 있습니다.'],
+  },
+  {
+    title: '교환·환불 안내',
+    lines: ['미개봉 상품은 수령 후 7일 이내 교환·환불 신청이 가능합니다.', '상품 개봉, 섭취, 패키지 훼손, 고객 보관 부주의로 가치가 감소한 경우 교환·환불이 제한될 수 있습니다.'],
+  },
+];
+
+const POLICY_NOTICES = [
+  {
+    id: 'terms',
+    title: '이용약관',
+    body: '회원 가입, 진단 결과 확인, 주문 및 결제 이용 조건을 고지합니다. 실제 결제 연동 전 최종 판매자 정보와 결제/취소 정책을 확정해 반영합니다.',
+  },
+  {
+    id: 'privacy',
+    title: '개인정보처리방침',
+    body: '카카오 로그인 식별자, 진단 답변, 주문 정보, 유입 채널 정보를 서비스 제공과 고객 응대, 정산 목적 범위에서 처리합니다.',
+  },
+  {
+    id: 'marketing',
+    title: '마케팅 수신 동의',
+    body: '동의한 고객에게 카카오 알림톡 또는 친구톡으로 진단 결과, 주문·배송 안내, 재구매 혜택을 발송할 수 있습니다. 동의는 언제든 철회할 수 있습니다.',
+  },
+];
+
 const ANSWERS = ['자주 느껴요', '가끔 느껴요', '거의 없어요'];
 
 const DIAGNOSIS_QUESTIONS = [
@@ -940,6 +977,53 @@ export default function App() {
         </div>
       </section>
 
+      <section id="product-info" className="px-6 py-16 md:py-24 bg-white">
+        <div className="max-w-6xl mx-auto">
+          <div className="mb-10 md:mb-12">
+            <p className="text-[#1A7F5A] font-bold mb-2">구매 전 확인</p>
+            <h2 className="text-2xl md:text-4xl font-bold">상품·배송·환불 안내</h2>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-5">
+            {COMMERCE_NOTICES.map((notice) => (
+              <div key={notice.title} className="rounded-2xl border border-gray-100 bg-gray-50 p-5 md:p-6">
+                <h3 className="mb-4 text-lg font-bold text-[#1C2B20]">{notice.title}</h3>
+                <ul className="space-y-3 text-sm leading-relaxed text-gray-600">
+                  {notice.lines.map((line) => (
+                    <li key={line} className="flex gap-2">
+                      <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[#1A7F5A]" />
+                      <span>{line}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+
+          <p className="mt-6 rounded-xl bg-[#EAF6EF] px-5 py-4 text-sm leading-relaxed text-[#1A7F5A]">
+            건강기능식품은 질병의 예방 및 치료를 위한 의약품이 아닙니다. 최종 판매 전 실제 제품의 표시사항, 기능성 원료, 섭취량, 섭취 시 주의사항을 기준으로 문구를 확정합니다.
+          </p>
+        </div>
+      </section>
+
+      <section id="policies" className="bg-gray-50 px-6 py-16 md:py-24 border-y border-gray-100">
+        <div className="max-w-6xl mx-auto">
+          <div className="mb-10 md:mb-12">
+            <p className="text-[#1A7F5A] font-bold mb-2">고객 동의와 보호</p>
+            <h2 className="text-2xl md:text-4xl font-bold">약관·개인정보·마케팅 동의</h2>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
+            {POLICY_NOTICES.map((policy) => (
+              <article id={policy.id} key={policy.id} className="rounded-2xl bg-white p-6 shadow-sm border border-gray-100">
+                <h3 className="mb-3 text-lg font-bold text-[#1C2B20]">{policy.title}</h3>
+                <p className="text-sm leading-relaxed text-gray-600">{policy.body}</p>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+
       <section className="bg-[#1C2B20] text-white px-6 py-16 md:py-24">
         <div className="max-w-6xl mx-auto">
           <h2 className="text-2xl md:text-4xl font-bold mb-12 md:mb-16 text-center">Pick & Pill이 신뢰받는 이유</h2>
@@ -1090,9 +1174,10 @@ export default function App() {
 
           <div className="mt-16 pt-8 border-t border-white/10 flex flex-col md:flex-row justify-between items-center gap-4 text-center md:text-left">
             <p>© 2026 Pick & Pill. All rights reserved.</p>
-            <div className="flex gap-4 text-white/60">
-              <button className="hover:text-white transition-colors">이용약관</button>
-              <button className="hover:text-white transition-colors font-bold">개인정보처리방침</button>
+            <div className="flex flex-wrap justify-center gap-4 text-white/60">
+              <a href="#terms" className="hover:text-white transition-colors">이용약관</a>
+              <a href="#privacy" className="hover:text-white transition-colors font-bold">개인정보처리방침</a>
+              <a href="#marketing" className="hover:text-white transition-colors">마케팅 수신 동의</a>
             </div>
           </div>
         </div>
