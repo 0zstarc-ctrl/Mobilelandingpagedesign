@@ -10,6 +10,7 @@ import {
   MessageCircle,
   CheckCircle2,
 } from 'lucide-react';
+import type { Session } from '@supabase/supabase-js';
 import { supabase } from './lib/supabaseClient';
 
 const ATTRIBUTION_STORAGE_KEY = 'picknpill_attribution';
@@ -388,14 +389,52 @@ function useAttribution() {
   return attribution;
 }
 
+function useKakaoAuthSession() {
+  const [session, setSession] = useState<Session | null>(null);
+  const [isAuthLoading, setIsAuthLoading] = useState(Boolean(supabase));
+
+  useEffect(() => {
+    if (!supabase) {
+      return;
+    }
+
+    let mounted = true;
+
+    supabase.auth.getSession().then(({ data }) => {
+      if (!mounted) {
+        return;
+      }
+
+      setSession(data.session);
+      setIsAuthLoading(false);
+    });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      setSession(nextSession);
+      setIsAuthLoading(false);
+    });
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  return { session, isAuthLoading };
+}
+
 export default function App() {
   const attribution = useAttribution();
+  const { session, isAuthLoading } = useKakaoAuthSession();
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [diagnosisAnswers, setDiagnosisAnswers] = useState<Record<string, string>>({});
   const [diagnosisResult, setDiagnosisResult] = useState<DiagnosisResult | null>(null);
   const [isSavingDiagnosis, setIsSavingDiagnosis] = useState(false);
   const [diagnosisSaved, setDiagnosisSaved] = useState(false);
   const [marketingOptIn, setMarketingOptIn] = useState(true);
+  const [authError, setAuthError] = useState<string | null>(null);
 
   const creatorName = useMemo(
     () => attribution?.creatorDisplayName || formatCreatorName(attribution?.creator),
@@ -407,6 +446,31 @@ export default function App() {
   const selectedOptionId = diagnosisAnswers[currentQuestion.id];
   const answeredCount = Object.keys(diagnosisAnswers).length;
   const isDiagnosisComplete = answeredCount === DIAGNOSIS_QUESTIONS.length;
+  const isLoggedIn = Boolean(session);
+  const kakaoLoginLabel = isLoggedIn ? '로그인 완료' : isAuthLoading ? '로그인 확인 중' : '카카오 로그인';
+
+  async function handleKakaoLogin() {
+    if (isLoggedIn) {
+      return;
+    }
+
+    if (!supabase) {
+      setAuthError('Supabase 환경 변수가 설정되지 않아 카카오 로그인을 시작할 수 없습니다.');
+      return;
+    }
+
+    setAuthError(null);
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'kakao',
+      options: {
+        redirectTo: window.location.origin + window.location.pathname,
+      },
+    });
+
+    if (error) {
+      setAuthError('카카오 로그인 연결 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.');
+    }
+  }
 
   async function saveDiagnosis(nextAnswers: Record<string, string>) {
     const answers = buildDiagnosisAnswers(nextAnswers);
@@ -457,9 +521,13 @@ export default function App() {
             </div>
             <span className="font-bold text-lg tracking-tight">Pick & Pill</span>
           </div>
-          <button className="flex items-center gap-1.5 bg-[#FEE500] text-[#371D1E] px-4 py-2 rounded-full text-sm font-semibold hover:bg-[#f4db00] transition-colors">
+          <button
+            onClick={handleKakaoLogin}
+            disabled={isLoggedIn || isAuthLoading}
+            className="flex items-center gap-1.5 bg-[#FEE500] text-[#371D1E] px-4 py-2 rounded-full text-sm font-semibold hover:bg-[#f4db00] transition-colors disabled:cursor-default disabled:opacity-80"
+          >
             <MessageCircle className="w-4 h-4 fill-current" />
-            카카오 로그인
+            {kakaoLoginLabel}
           </button>
         </div>
       </header>
@@ -492,8 +560,12 @@ export default function App() {
             <a href="#diagnosis" className="w-full sm:w-auto px-6 lg:px-8 bg-[#1A7F5A] text-white py-4 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-[#146648] transition-colors shadow-lg">
               건강 진단하기 <ChevronRight className="w-5 h-5" />
             </a>
-            <button className="w-full sm:w-auto px-6 lg:px-8 bg-[#FEE500] text-[#371D1E] py-4 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-[#f4db00] transition-colors shadow-lg">
-              <MessageCircle className="w-5 h-5 fill-current" /> 카카오로 3초 만에 시작
+            <button
+              onClick={handleKakaoLogin}
+              disabled={isLoggedIn || isAuthLoading}
+              className="w-full sm:w-auto px-6 lg:px-8 bg-[#FEE500] text-[#371D1E] py-4 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-[#f4db00] transition-colors shadow-lg disabled:cursor-default disabled:opacity-80"
+            >
+              <MessageCircle className="w-5 h-5 fill-current" /> {isLoggedIn ? '카카오 로그인 완료' : '카카오로 3초 만에 시작'}
             </button>
           </div>
         </div>
@@ -572,8 +644,17 @@ export default function App() {
                       카카오 알림톡으로 진단 결과, 주문/배송 안내, 재구매 혜택을 받아볼게요.
                     </span>
                   </label>
-                  <button className="mt-4 w-full rounded-xl bg-[#FEE500] px-5 py-4 font-bold text-[#371D1E] transition-colors hover:bg-[#f4db00]">
-                    카카오 로그인하고 전체 결과 보기
+                  {authError && (
+                    <p className="mt-4 rounded-xl bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+                      {authError}
+                    </p>
+                  )}
+                  <button
+                    onClick={handleKakaoLogin}
+                    disabled={isLoggedIn || isAuthLoading}
+                    className="mt-4 w-full rounded-xl bg-[#FEE500] px-5 py-4 font-bold text-[#371D1E] transition-colors hover:bg-[#f4db00] disabled:cursor-default disabled:opacity-80"
+                  >
+                    {isLoggedIn ? '로그인 완료 - 전체 결과 준비 중' : '카카오 로그인하고 전체 결과 보기'}
                   </button>
                 </div>
               )}
