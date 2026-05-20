@@ -10,8 +10,10 @@ import {
   MessageCircle,
   CheckCircle2,
 } from 'lucide-react';
+import { supabase } from './lib/supabaseClient';
 
 const ATTRIBUTION_STORAGE_KEY = 'picknpill_attribution';
+const SESSION_STORAGE_KEY = 'picknpill_session_id';
 
 const IMAGES = {
   hero: 'https://images.unsplash.com/photo-1518173946687-a4c8892bbd9f?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxjbGVhbiUyMGhlYWx0aHklMjBuYXR1cmUlMjBsZWF2ZXN8ZW58MXx8fHwxNzc5MTA3MTc4fDA&ixlib=rb-4.1.0&q=80&w=1080',
@@ -84,7 +86,11 @@ const ANSWERS = ['자주 느껴요', '가끔 느껴요', '거의 없어요'];
 
 type Attribution = {
   creator?: string;
+  creatorId?: string;
+  creatorDisplayName?: string;
   campaign?: string;
+  campaignId?: string;
+  benefitLabel?: string;
   utmSource?: string;
   utmMedium?: string;
   utmCampaign?: string;
@@ -93,6 +99,19 @@ type Attribution = {
   referrer?: string;
   firstSeenAt: string;
   lastSeenAt: string;
+  visitStatus?: 'pending' | 'recorded' | 'skipped';
+};
+
+type CreatorRow = {
+  id: string;
+  slug: string;
+  display_name: string;
+};
+
+type CampaignRow = {
+  id: string;
+  code: string;
+  benefit_label: string | null;
 };
 
 function formatCreatorName(slug?: string) {
@@ -116,31 +135,138 @@ function readStoredAttribution(): Attribution | null {
   }
 }
 
+function getSessionId() {
+  const existing = window.localStorage.getItem(SESSION_STORAGE_KEY);
+  if (existing) {
+    return existing;
+  }
+
+  const next = crypto.randomUUID();
+  window.localStorage.setItem(SESSION_STORAGE_KEY, next);
+  return next;
+}
+
+function persistAttribution(attribution: Attribution) {
+  window.localStorage.setItem(ATTRIBUTION_STORAGE_KEY, JSON.stringify(attribution));
+}
+
 function useAttribution() {
   const [attribution, setAttribution] = useState<Attribution | null>(null);
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const now = new Date().toISOString();
-    const stored = readStoredAttribution();
-    const creator = params.get('creator') || stored?.creator;
-    const campaign = params.get('campaign') || params.get('utm_campaign') || stored?.campaign;
+    let cancelled = false;
 
-    const next: Attribution = {
-      creator: creator || undefined,
-      campaign: campaign || undefined,
-      utmSource: params.get('utm_source') || stored?.utmSource || 'youtube',
-      utmMedium: params.get('utm_medium') || stored?.utmMedium || 'influencer',
-      utmCampaign: params.get('utm_campaign') || stored?.utmCampaign || campaign || undefined,
-      contentId: params.get('content_id') || stored?.contentId || undefined,
-      landingUrl: window.location.href,
-      referrer: document.referrer || stored?.referrer || undefined,
-      firstSeenAt: stored?.firstSeenAt || now,
-      lastSeenAt: now,
+    async function resolveAttribution() {
+      const params = new URLSearchParams(window.location.search);
+      const now = new Date().toISOString();
+      const stored = readStoredAttribution();
+      const creator = params.get('creator') || stored?.creator;
+      const campaign = params.get('campaign') || params.get('utm_campaign') || stored?.campaign;
+
+      let next: Attribution = {
+        creator: creator || undefined,
+        creatorId: stored?.creatorId,
+        creatorDisplayName: stored?.creatorDisplayName,
+        campaign: campaign || undefined,
+        campaignId: stored?.campaignId,
+        benefitLabel: stored?.benefitLabel,
+        utmSource: params.get('utm_source') || stored?.utmSource || 'youtube',
+        utmMedium: params.get('utm_medium') || stored?.utmMedium || 'influencer',
+        utmCampaign: params.get('utm_campaign') || stored?.utmCampaign || campaign || undefined,
+        contentId: params.get('content_id') || stored?.contentId || undefined,
+        landingUrl: window.location.href,
+        referrer: document.referrer || stored?.referrer || undefined,
+        firstSeenAt: stored?.firstSeenAt || now,
+        lastSeenAt: now,
+        visitStatus: supabase ? 'pending' : 'skipped',
+      };
+
+      if (!cancelled) {
+        setAttribution(next);
+      }
+      persistAttribution(next);
+
+      if (!supabase || !creator) {
+        return;
+      }
+
+      const { data: creatorRow } = await supabase
+        .from('creators')
+        .select('id, slug, display_name')
+        .eq('slug', creator)
+        .maybeSingle<CreatorRow>();
+
+      if (!creatorRow) {
+        next = { ...next, visitStatus: 'skipped' };
+        if (!cancelled) {
+          setAttribution(next);
+        }
+        persistAttribution(next);
+        return;
+      }
+
+      let campaignRow: CampaignRow | null = null;
+      if (campaign) {
+        const { data } = await supabase
+          .from('creator_campaigns')
+          .select('id, code, benefit_label')
+          .eq('code', campaign)
+          .eq('creator_id', creatorRow.id)
+          .maybeSingle<CampaignRow>();
+        campaignRow = data;
+      }
+
+      next = {
+        ...next,
+        creatorId: creatorRow.id,
+        creatorDisplayName: creatorRow.display_name,
+        campaignId: campaignRow?.id,
+        benefitLabel: campaignRow?.benefit_label || next.benefitLabel,
+      };
+
+      const snapshot = {
+        creator: next.creator,
+        creatorId: next.creatorId,
+        creatorDisplayName: next.creatorDisplayName,
+        campaign: next.campaign,
+        campaignId: next.campaignId,
+        benefitLabel: next.benefitLabel,
+        utmSource: next.utmSource,
+        utmMedium: next.utmMedium,
+        utmCampaign: next.utmCampaign,
+        contentId: next.contentId,
+      };
+
+      const { error } = await supabase.from('visits').insert({
+        session_id: getSessionId(),
+        creator_id: next.creatorId,
+        campaign_id: next.campaignId,
+        landing_url: next.landingUrl,
+        referrer: next.referrer,
+        utm_source: next.utmSource,
+        utm_medium: next.utmMedium,
+        utm_campaign: next.utmCampaign,
+        content_id: next.contentId,
+        user_agent: window.navigator.userAgent,
+        attribution_snapshot: snapshot,
+      });
+
+      next = {
+        ...next,
+        visitStatus: error ? 'skipped' : 'recorded',
+      };
+
+      if (!cancelled) {
+        setAttribution(next);
+      }
+      persistAttribution(next);
+    }
+
+    resolveAttribution();
+
+    return () => {
+      cancelled = true;
     };
-
-    setAttribution(next);
-    window.localStorage.setItem(ATTRIBUTION_STORAGE_KEY, JSON.stringify(next));
   }, []);
 
   return attribution;
@@ -150,9 +276,12 @@ export default function App() {
   const attribution = useAttribution();
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
 
-  const creatorName = useMemo(() => formatCreatorName(attribution?.creator), [attribution?.creator]);
+  const creatorName = useMemo(
+    () => attribution?.creatorDisplayName || formatCreatorName(attribution?.creator),
+    [attribution?.creator, attribution?.creatorDisplayName],
+  );
   const heroEyebrow = creatorName ? `${creatorName} 구독자 전용 건강 루틴` : '유튜버 추천 건강기능식품';
-  const benefitLabel = attribution?.campaign ? '채널 전용 혜택 적용 가능' : '5만원 이상 구매 시 무료배송';
+  const benefitLabel = attribution?.benefitLabel || (attribution?.campaign ? '채널 전용 혜택 적용 가능' : '5만원 이상 구매 시 무료배송');
 
   return (
     <div className="bg-white min-h-screen relative text-[#1C2B20] font-sans selection:bg-[#1A7F5A] selection:text-white">
@@ -219,9 +348,7 @@ export default function App() {
               <span className="text-sm font-medium text-gray-400">1/5</span>
             </div>
 
-            <h3 className="text-xl md:text-2xl font-bold mb-8 md:mb-10 text-center">
-              최근 피로감을 자주 느끼시나요?
-            </h3>
+            <h3 className="text-xl md:text-2xl font-bold mb-8 md:mb-10 text-center">최근 피로감을 자주 느끼시나요?</h3>
 
             <div className="flex flex-col gap-3 mb-8 relative z-10">
               {ANSWERS.map((answer, idx) => (
