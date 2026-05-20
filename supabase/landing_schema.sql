@@ -596,6 +596,9 @@ $$;
 
 revoke all on function private.is_landing_admin() from public, anon, authenticated;
 
+drop function if exists public.get_creator_admin_reports();
+drop function if exists private.get_creator_admin_reports();
+
 create or replace function private.get_creator_admin_reports()
 returns table (
   report_month date,
