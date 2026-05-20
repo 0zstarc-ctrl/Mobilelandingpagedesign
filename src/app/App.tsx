@@ -719,6 +719,7 @@ export default function App() {
   const [landingCustomerId, setLandingCustomerId] = useState<string | null>(null);
   const [customerSyncStatus, setCustomerSyncStatus] = useState<CustomerSyncStatus>('idle');
   const [checkoutMessage, setCheckoutMessage] = useState<string | null>(null);
+  const [checkoutMessageTone, setCheckoutMessageTone] = useState<'success' | 'error'>('success');
   const [isStartingCheckout, setIsStartingCheckout] = useState(false);
 
   const creatorName = useMemo(
@@ -847,6 +848,7 @@ export default function App() {
 
   async function startCheckout(item: PurchaseItem, paymentMethod?: PaymentMethod) {
     if (!supabase) {
+      setCheckoutMessageTone('error');
       setCheckoutMessage('주문 저장을 위해 Supabase 환경 설정이 필요합니다.');
       return;
     }
@@ -878,10 +880,12 @@ export default function App() {
     setIsStartingCheckout(false);
 
     if (error) {
+      setCheckoutMessageTone('error');
       setCheckoutMessage('주문 준비 저장에 실패했습니다. 잠시 후 다시 시도해 주세요.');
       return;
     }
 
+    setCheckoutMessageTone('success');
     setCheckoutMessage('주문 준비가 저장되었습니다. 다음 단계에서 실제 결제창을 연결합니다.');
   }
 
@@ -1137,12 +1141,23 @@ export default function App() {
                     disabled={isStartingCheckout}
                     className="mt-4 w-full rounded-xl bg-[#1A7F5A] px-4 py-3 text-sm font-bold text-white transition-colors hover:bg-[#146648] disabled:cursor-wait disabled:opacity-70"
                   >
-                    구매 준비하기
+                    {isStartingCheckout ? '저장 중' : '구매 준비하기'}
                   </button>
                 </div>
               </div>
             ))}
           </div>
+          {checkoutMessage && (
+            <p
+              className={`mt-6 rounded-xl px-5 py-4 text-center text-sm font-semibold ${
+                checkoutMessageTone === 'success'
+                  ? 'bg-[#EAF6EF] text-[#1A7F5A]'
+                  : 'bg-red-50 text-red-700'
+              }`}
+            >
+              {checkoutMessage}
+            </p>
+          )}
         </div>
       </section>
 
@@ -1185,7 +1200,13 @@ export default function App() {
             ))}
           </div>
           {checkoutMessage && (
-            <p className="mt-6 rounded-xl bg-white px-5 py-4 text-center text-sm font-semibold text-[#1A7F5A] shadow-sm">
+            <p
+              className={`mt-6 rounded-xl px-5 py-4 text-center text-sm font-semibold shadow-sm ${
+                checkoutMessageTone === 'success'
+                  ? 'bg-white text-[#1A7F5A]'
+                  : 'bg-red-50 text-red-700'
+              }`}
+            >
               {checkoutMessage}
             </p>
           )}
@@ -1362,7 +1383,13 @@ export default function App() {
             </button>
           </div>
           {checkoutMessage && (
-            <p className="mx-auto mt-6 max-w-xl rounded-xl bg-white/10 px-5 py-4 text-sm font-semibold text-white">
+            <p
+              className={`mx-auto mt-6 max-w-xl rounded-xl px-5 py-4 text-sm font-semibold ${
+                checkoutMessageTone === 'success'
+                  ? 'bg-white/10 text-white'
+                  : 'bg-red-50 text-red-700'
+              }`}
+            >
               {checkoutMessage}
             </p>
           )}
