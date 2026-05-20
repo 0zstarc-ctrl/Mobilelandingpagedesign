@@ -395,6 +395,7 @@ export default function App() {
   const [diagnosisResult, setDiagnosisResult] = useState<DiagnosisResult | null>(null);
   const [isSavingDiagnosis, setIsSavingDiagnosis] = useState(false);
   const [diagnosisSaved, setDiagnosisSaved] = useState(false);
+  const [marketingOptIn, setMarketingOptIn] = useState(true);
 
   const creatorName = useMemo(
     () => attribution?.creatorDisplayName || formatCreatorName(attribution?.creator),
@@ -560,6 +561,20 @@ export default function App() {
                   </p>
                   <h4 className="text-lg font-bold mb-2">{diagnosisResult.title}</h4>
                   <p className="text-sm text-gray-600">{diagnosisResult.summary}</p>
+                  <label className="mt-5 flex items-start gap-3 rounded-xl bg-white/70 p-4 text-sm text-gray-700">
+                    <input
+                      type="checkbox"
+                      checked={marketingOptIn}
+                      onChange={(event) => setMarketingOptIn(event.target.checked)}
+                      className="mt-1 h-4 w-4 accent-[#1A7F5A]"
+                    />
+                    <span>
+                      카카오 알림톡으로 진단 결과, 주문/배송 안내, 재구매 혜택을 받아볼게요.
+                    </span>
+                  </label>
+                  <button className="mt-4 w-full rounded-xl bg-[#FEE500] px-5 py-4 font-bold text-[#371D1E] transition-colors hover:bg-[#f4db00]">
+                    카카오 로그인하고 전체 결과 보기
+                  </button>
                 </div>
               )}
             </div>
