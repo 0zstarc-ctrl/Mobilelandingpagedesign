@@ -84,6 +84,54 @@ const SETS = [
 
 const ANSWERS = ['자주 느껴요', '가끔 느껴요', '거의 없어요'];
 
+const DIAGNOSIS_QUESTIONS = [
+  {
+    id: 'fatigue',
+    title: '최근 피로감을 자주 느끼시나요?',
+    options: [
+      { id: 'often', label: '자주 느껴요', score: 3 },
+      { id: 'sometimes', label: '가끔 느껴요', score: 2 },
+      { id: 'rarely', label: '거의 없어요', score: 1 },
+    ],
+  },
+  {
+    id: 'digestion',
+    title: '식사 후 속이 더부룩한 편인가요?',
+    options: [
+      { id: 'often', label: '자주 그래요', score: 3 },
+      { id: 'sometimes', label: '가끔 그래요', score: 2 },
+      { id: 'rarely', label: '편안한 편이에요', score: 1 },
+    ],
+  },
+  {
+    id: 'immunity',
+    title: '환절기 컨디션 변화가 잦은가요?',
+    options: [
+      { id: 'often', label: '자주 흔들려요', score: 3 },
+      { id: 'sometimes', label: '가끔 있어요', score: 2 },
+      { id: 'rarely', label: '괜찮은 편이에요', score: 1 },
+    ],
+  },
+  {
+    id: 'beauty',
+    title: '피부 생기나 항산화 관리에 관심이 있나요?',
+    options: [
+      { id: 'high', label: '관심이 많아요', score: 3 },
+      { id: 'medium', label: '조금 있어요', score: 2 },
+      { id: 'low', label: '아직은 적어요', score: 1 },
+    ],
+  },
+  {
+    id: 'routine',
+    title: '영양제를 꾸준히 챙겨 먹기 어려운가요?',
+    options: [
+      { id: 'often', label: '자주 놓쳐요', score: 3 },
+      { id: 'sometimes', label: '가끔 놓쳐요', score: 2 },
+      { id: 'rarely', label: '잘 챙기는 편이에요', score: 1 },
+    ],
+  },
+];
+
 type Attribution = {
   creator?: string;
   creatorId?: string;
@@ -112,6 +160,19 @@ type CampaignRow = {
   id: string;
   code: string;
   benefit_label: string | null;
+};
+
+type DiagnosisAnswer = {
+  questionId: string;
+  optionId: string;
+  label: string;
+  score: number;
+};
+
+type DiagnosisResult = {
+  code: string;
+  title: string;
+  summary: string;
 };
 
 function formatCreatorName(slug?: string) {
@@ -148,6 +209,61 @@ function getSessionId() {
 
 function persistAttribution(attribution: Attribution) {
   window.localStorage.setItem(ATTRIBUTION_STORAGE_KEY, JSON.stringify(attribution));
+}
+
+function buildDiagnosisAnswers(selectedAnswers: Record<string, string>): DiagnosisAnswer[] {
+  return DIAGNOSIS_QUESTIONS.flatMap((question) => {
+    const optionId = selectedAnswers[question.id];
+    const option = question.options.find((item) => item.id === optionId);
+
+    if (!option) {
+      return [];
+    }
+
+    return [
+      {
+        questionId: question.id,
+        optionId: option.id,
+        label: option.label,
+        score: option.score,
+      },
+    ];
+  });
+}
+
+function getDiagnosisResult(answers: DiagnosisAnswer[]): DiagnosisResult {
+  const totalScore = answers.reduce((sum, answer) => sum + answer.score, 0);
+  const topAnswer = [...answers].sort((a, b) => b.score - a.score)[0];
+
+  if (topAnswer?.questionId === 'digestion') {
+    return {
+      code: 'gut_balance',
+      title: '장 건강 밸런스 루틴',
+      summary: '속 편한 하루를 위해 장 건강과 데일리 루틴을 함께 챙기는 구성이 잘 맞습니다.',
+    };
+  }
+
+  if (topAnswer?.questionId === 'beauty') {
+    return {
+      code: 'inner_beauty',
+      title: '이너뷰티 항산화 루틴',
+      summary: '생기와 항산화 관리에 초점을 맞춘 비타민 C 중심 루틴을 추천합니다.',
+    };
+  }
+
+  if (totalScore >= 12) {
+    return {
+      code: 'energy_recovery',
+      title: '피로 회복 집중 루틴',
+      summary: '최근 컨디션 관리가 필요해 보여요. 철분, 홍삼, 장 건강 루틴을 함께 살펴보세요.',
+    };
+  }
+
+  return {
+    code: 'daily_balance',
+    title: '데일리 밸런스 루틴',
+    summary: '현재 컨디션을 유지하면서 부족한 성분을 가볍게 보완하는 구성이 잘 맞습니다.',
+  };
 }
 
 function useAttribution() {
@@ -274,7 +390,11 @@ function useAttribution() {
 
 export default function App() {
   const attribution = useAttribution();
-  const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [diagnosisAnswers, setDiagnosisAnswers] = useState<Record<string, string>>({});
+  const [diagnosisResult, setDiagnosisResult] = useState<DiagnosisResult | null>(null);
+  const [isSavingDiagnosis, setIsSavingDiagnosis] = useState(false);
+  const [diagnosisSaved, setDiagnosisSaved] = useState(false);
 
   const creatorName = useMemo(
     () => attribution?.creatorDisplayName || formatCreatorName(attribution?.creator),
@@ -282,6 +402,49 @@ export default function App() {
   );
   const heroEyebrow = creatorName ? `${creatorName} 구독자 전용 건강 루틴` : '유튜버 추천 건강기능식품';
   const benefitLabel = attribution?.benefitLabel || (attribution?.campaign ? '채널 전용 혜택 적용 가능' : '5만원 이상 구매 시 무료배송');
+  const currentQuestion = DIAGNOSIS_QUESTIONS[currentQuestionIndex];
+  const selectedOptionId = diagnosisAnswers[currentQuestion.id];
+  const answeredCount = Object.keys(diagnosisAnswers).length;
+  const isDiagnosisComplete = answeredCount === DIAGNOSIS_QUESTIONS.length;
+
+  async function saveDiagnosis(nextAnswers: Record<string, string>) {
+    const answers = buildDiagnosisAnswers(nextAnswers);
+    const result = getDiagnosisResult(answers);
+
+    setDiagnosisResult(result);
+    setDiagnosisSaved(false);
+
+    if (!supabase) {
+      return;
+    }
+
+    setIsSavingDiagnosis(true);
+    const { error } = await supabase.from('diagnoses').insert({
+      session_id: getSessionId(),
+      creator_id: attribution?.creatorId,
+      campaign_id: attribution?.campaignId,
+      answers,
+      result,
+      result_code: result.code,
+    });
+    setIsSavingDiagnosis(false);
+    setDiagnosisSaved(!error);
+  }
+
+  function handleDiagnosisAnswer(optionId: string) {
+    const nextAnswers = {
+      ...diagnosisAnswers,
+      [currentQuestion.id]: optionId,
+    };
+    setDiagnosisAnswers(nextAnswers);
+
+    if (currentQuestionIndex < DIAGNOSIS_QUESTIONS.length - 1) {
+      setCurrentQuestionIndex(currentQuestionIndex + 1);
+      return;
+    }
+
+    saveDiagnosis(nextAnswers);
+  }
 
   return (
     <div className="bg-white min-h-screen relative text-[#1C2B20] font-sans selection:bg-[#1A7F5A] selection:text-white">
@@ -344,32 +507,61 @@ export default function App() {
 
           <div className="bg-white rounded-2xl md:rounded-3xl p-6 md:p-10 shadow-sm border border-[#1A7F5A]/10 relative overflow-hidden max-w-xl mx-auto">
             <div className="flex items-center justify-between mb-8">
-              <span className="text-sm font-bold text-[#1A7F5A] bg-[#EAF6EF] px-3 py-1.5 rounded-full">Q 1</span>
-              <span className="text-sm font-medium text-gray-400">1/5</span>
+              <span className="text-sm font-bold text-[#1A7F5A] bg-[#EAF6EF] px-3 py-1.5 rounded-full">
+                Q {currentQuestionIndex + 1}
+              </span>
+              <span className="text-sm font-medium text-gray-400">
+                {answeredCount}/{DIAGNOSIS_QUESTIONS.length}
+              </span>
             </div>
 
-            <h3 className="text-xl md:text-2xl font-bold mb-8 md:mb-10 text-center">최근 피로감을 자주 느끼시나요?</h3>
+            <div className="h-2 bg-gray-100 rounded-full mb-8 overflow-hidden">
+              <div
+                className="h-full bg-[#1A7F5A] transition-all"
+                style={{ width: `${(answeredCount / DIAGNOSIS_QUESTIONS.length) * 100}%` }}
+              />
+            </div>
+
+            <h3 className="text-xl md:text-2xl font-bold mb-8 md:mb-10 text-center">{currentQuestion.title}</h3>
 
             <div className="flex flex-col gap-3 mb-8 relative z-10">
-              {ANSWERS.map((answer, idx) => (
+              {currentQuestion.options.map((option) => (
                 <button
-                  key={answer}
-                  onClick={() => setSelectedAnswer(idx)}
+                  key={option.id}
+                  onClick={() => handleDiagnosisAnswer(option.id)}
                   className={`w-full py-4 px-6 rounded-xl border text-center md:text-lg font-medium transition-all ${
-                    selectedAnswer === idx
+                    selectedOptionId === option.id
                       ? 'border-[#1A7F5A] bg-[#1A7F5A]/5 text-[#1A7F5A]'
                       : 'border-gray-200 hover:border-[#1A7F5A]/50 text-gray-700'
                   }`}
                 >
-                  {answer}
+                  {option.label}
                 </button>
               ))}
             </div>
+
+            {currentQuestionIndex > 0 && !isDiagnosisComplete && (
+              <button
+                onClick={() => setCurrentQuestionIndex(currentQuestionIndex - 1)}
+                className="mb-8 w-full text-sm font-bold text-[#1A7F5A] hover:text-[#146648]"
+              >
+                이전 질문으로 돌아가기
+              </button>
+            )}
 
             <div className="border-t border-dashed border-gray-200 pt-6">
               <p className="text-sm text-center text-gray-500 font-medium">
                 결과 확인 시 추천 성분과 전용 혜택을 안내합니다. 카카오 로그인이 필요합니다.
               </p>
+              {diagnosisResult && (
+                <div className="mt-5 rounded-2xl bg-[#EAF6EF] p-5 text-left">
+                  <p className="text-xs font-bold text-[#1A7F5A] mb-2">
+                    {diagnosisSaved ? '진단 결과 저장 완료' : isSavingDiagnosis ? '진단 결과 저장 중' : '진단 결과 미리보기'}
+                  </p>
+                  <h4 className="text-lg font-bold mb-2">{diagnosisResult.title}</h4>
+                  <p className="text-sm text-gray-600">{diagnosisResult.summary}</p>
+                </div>
+              )}
             </div>
 
             <div className="mt-10 pt-10 border-t border-gray-100 relative">
