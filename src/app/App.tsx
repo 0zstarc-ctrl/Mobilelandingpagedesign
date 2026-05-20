@@ -223,6 +223,24 @@ type PurchaseItem = {
   price: string;
 };
 
+type CreatorAdminReport = {
+  report_month: string;
+  creator_slug: string | null;
+  creator_name: string | null;
+  campaign_code: string | null;
+  visit_count: number;
+  visitor_session_count: number;
+  known_visitor_count: number;
+  diagnosis_count: number;
+  diagnosed_customer_count: number;
+  checkout_started_count: number;
+  checkout_started_amount: number;
+  paid_order_count: number;
+  paid_quantity: number;
+  paid_sales_amount: number;
+  cancelled_or_failed_count: number;
+};
+
 function formatCreatorName(slug?: string) {
   if (!slug) {
     return '';
@@ -504,6 +522,190 @@ function parseWonAmount(price: string) {
   return Number(price.replace(/[^\d]/g, '')) || 0;
 }
 
+function formatNumber(value: number | null | undefined) {
+  return Number(value || 0).toLocaleString('ko-KR');
+}
+
+function AdminReports({
+  session,
+  isAuthLoading,
+  onLogin,
+  onLogout,
+}: {
+  session: Session | null;
+  isAuthLoading: boolean;
+  onLogin: () => void;
+  onLogout: () => void;
+}) {
+  const [reports, setReports] = useState<CreatorAdminReport[]>([]);
+  const [isLoadingReports, setIsLoadingReports] = useState(false);
+  const [reportError, setReportError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!supabase || !session) {
+      setReports([]);
+      return;
+    }
+
+    let cancelled = false;
+
+    async function loadReports() {
+      setIsLoadingReports(true);
+      setReportError(null);
+
+      const { data, error } = await supabase.rpc('get_creator_admin_reports');
+
+      if (cancelled) {
+        return;
+      }
+
+      setIsLoadingReports(false);
+
+      if (error) {
+        setReportError('리포트를 불러오지 못했습니다. Supabase admin_users 권한과 SQL 적용 여부를 확인해 주세요.');
+        setReports([]);
+        return;
+      }
+
+      setReports((data || []) as CreatorAdminReport[]);
+    }
+
+    loadReports();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [session?.user.id]);
+
+  const totals = reports.reduce(
+    (acc, report) => ({
+      visits: acc.visits + Number(report.visit_count || 0),
+      diagnoses: acc.diagnoses + Number(report.diagnosis_count || 0),
+      checkouts: acc.checkouts + Number(report.checkout_started_count || 0),
+      paidAmount: acc.paidAmount + Number(report.paid_sales_amount || 0),
+    }),
+    { visits: 0, diagnoses: 0, checkouts: 0, paidAmount: 0 },
+  );
+
+  return (
+    <div className="min-h-screen bg-gray-50 text-[#1C2B20]">
+      <header className="border-b border-gray-200 bg-white">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#1A7F5A]">
+              <HeartPulse className="h-5 w-5 text-white" />
+            </div>
+            <div>
+              <p className="text-sm font-bold text-[#1A7F5A]">Pick & Pill</p>
+              <h1 className="text-lg font-bold">유튜버 월간 리포트</h1>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <a href="/" className="rounded-full border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-50">
+              랜딩 보기
+            </a>
+            {session ? (
+              <button onClick={onLogout} className="rounded-full bg-[#1C2B20] px-4 py-2 text-sm font-semibold text-white">
+                로그아웃
+              </button>
+            ) : (
+              <button
+                onClick={onLogin}
+                disabled={isAuthLoading}
+                className="rounded-full bg-[#FEE500] px-4 py-2 text-sm font-bold text-[#371D1E] disabled:opacity-70"
+              >
+                카카오 로그인
+              </button>
+            )}
+          </div>
+        </div>
+      </header>
+
+      <main className="mx-auto max-w-7xl px-5 py-8">
+        {!session ? (
+          <section className="rounded-2xl bg-white p-8 shadow-sm">
+            <h2 className="mb-3 text-2xl font-bold">관리자 로그인이 필요합니다</h2>
+            <p className="mb-6 text-gray-600">카카오 로그인 후 Supabase `admin_users`에 등록된 계정만 리포트를 볼 수 있습니다.</p>
+            <button onClick={onLogin} className="rounded-xl bg-[#FEE500] px-5 py-3 font-bold text-[#371D1E]">
+              카카오로 관리자 로그인
+            </button>
+          </section>
+        ) : (
+          <>
+            <section className="grid grid-cols-2 gap-4 md:grid-cols-4">
+              <div className="rounded-2xl bg-white p-5 shadow-sm">
+                <p className="text-sm font-semibold text-gray-500">방문</p>
+                <p className="mt-2 text-3xl font-bold">{formatNumber(totals.visits)}</p>
+              </div>
+              <div className="rounded-2xl bg-white p-5 shadow-sm">
+                <p className="text-sm font-semibold text-gray-500">진단 완료</p>
+                <p className="mt-2 text-3xl font-bold">{formatNumber(totals.diagnoses)}</p>
+              </div>
+              <div className="rounded-2xl bg-white p-5 shadow-sm">
+                <p className="text-sm font-semibold text-gray-500">주문 시작</p>
+                <p className="mt-2 text-3xl font-bold">{formatNumber(totals.checkouts)}</p>
+              </div>
+              <div className="rounded-2xl bg-white p-5 shadow-sm">
+                <p className="text-sm font-semibold text-gray-500">결제 완료 금액</p>
+                <p className="mt-2 text-3xl font-bold">{formatNumber(totals.paidAmount)}원</p>
+              </div>
+            </section>
+
+            <section className="mt-6 overflow-hidden rounded-2xl bg-white shadow-sm">
+              <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
+                <h2 className="text-lg font-bold">월별 캠페인 리포트</h2>
+                <p className="text-sm text-gray-500">{isLoadingReports ? '불러오는 중' : `${reports.length}개 행`}</p>
+              </div>
+
+              {reportError && <p className="m-5 rounded-xl bg-red-50 p-4 text-sm font-semibold text-red-700">{reportError}</p>}
+
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-left text-sm">
+                  <thead className="bg-gray-50 text-xs uppercase text-gray-500">
+                    <tr>
+                      <th className="px-4 py-3">월</th>
+                      <th className="px-4 py-3">유튜버</th>
+                      <th className="px-4 py-3">캠페인</th>
+                      <th className="px-4 py-3 text-right">방문</th>
+                      <th className="px-4 py-3 text-right">진단</th>
+                      <th className="px-4 py-3 text-right">주문 시작</th>
+                      <th className="px-4 py-3 text-right">주문 시작 금액</th>
+                      <th className="px-4 py-3 text-right">결제 완료</th>
+                      <th className="px-4 py-3 text-right">결제 금액</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {reports.map((report) => (
+                      <tr key={`${report.report_month}-${report.creator_slug}-${report.campaign_code}`}>
+                        <td className="whitespace-nowrap px-4 py-4 font-semibold">{report.report_month}</td>
+                        <td className="whitespace-nowrap px-4 py-4">{report.creator_name || report.creator_slug}</td>
+                        <td className="whitespace-nowrap px-4 py-4">{report.campaign_code || '-'}</td>
+                        <td className="px-4 py-4 text-right">{formatNumber(report.visit_count)}</td>
+                        <td className="px-4 py-4 text-right">{formatNumber(report.diagnosis_count)}</td>
+                        <td className="px-4 py-4 text-right">{formatNumber(report.checkout_started_count)}</td>
+                        <td className="px-4 py-4 text-right">{formatNumber(report.checkout_started_amount)}원</td>
+                        <td className="px-4 py-4 text-right">{formatNumber(report.paid_order_count)}</td>
+                        <td className="px-4 py-4 text-right font-bold text-[#1A7F5A]">{formatNumber(report.paid_sales_amount)}원</td>
+                      </tr>
+                    ))}
+                    {!isLoadingReports && reports.length === 0 && !reportError && (
+                      <tr>
+                        <td colSpan={9} className="px-4 py-10 text-center text-gray-500">
+                          표시할 리포트가 없습니다.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          </>
+        )}
+      </main>
+    </div>
+  );
+}
+
 export default function App() {
   const attribution = useAttribution();
   const { session, isAuthLoading } = useKakaoAuthSession();
@@ -591,7 +793,7 @@ export default function App() {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'kakao',
       options: {
-        redirectTo: window.location.origin + window.location.pathname,
+        redirectTo: window.location.origin + window.location.pathname + window.location.search,
         scopes: 'profile_nickname profile_image',
       },
     });
@@ -696,6 +898,19 @@ export default function App() {
     }
 
     saveDiagnosis(nextAnswers);
+  }
+
+  const isAdminView = new URLSearchParams(window.location.search).get('admin') === '1';
+
+  if (isAdminView) {
+    return (
+      <AdminReports
+        session={session}
+        isAuthLoading={isAuthLoading}
+        onLogin={handleKakaoLogin}
+        onLogout={handleLogout}
+      />
+    );
   }
 
   return (
