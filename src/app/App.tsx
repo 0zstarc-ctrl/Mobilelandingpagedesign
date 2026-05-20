@@ -176,6 +176,8 @@ type DiagnosisResult = {
   summary: string;
 };
 
+type CustomerSyncStatus = 'idle' | 'syncing' | 'synced' | 'failed';
+
 function formatCreatorName(slug?: string) {
   if (!slug) {
     return '';
@@ -425,6 +427,34 @@ function useKakaoAuthSession() {
   return { session, isAuthLoading };
 }
 
+function readMetadataString(metadata: Record<string, unknown> | undefined, keys: string[]) {
+  for (const key of keys) {
+    const value = metadata?.[key];
+
+    if (typeof value === 'string' && value.trim()) {
+      return value;
+    }
+  }
+
+  return undefined;
+}
+
+function readKakaoProfile(session: Session) {
+  const userMetadata = session.user.user_metadata as Record<string, unknown> | undefined;
+  const kakaoIdentity = session.user.identities?.find((identity) => identity.provider === 'kakao');
+  const identityData = kakaoIdentity?.identity_data as Record<string, unknown> | undefined;
+
+  return {
+    displayName:
+      readMetadataString(identityData, ['name', 'nickname', 'full_name']) ||
+      readMetadataString(userMetadata, ['name', 'nickname', 'full_name']),
+    email: session.user.email || readMetadataString(identityData, ['email']),
+    kakaoUserId:
+      readMetadataString(identityData, ['sub', 'id']) ||
+      (typeof kakaoIdentity?.id === 'string' ? kakaoIdentity.id : undefined),
+  };
+}
+
 export default function App() {
   const attribution = useAttribution();
   const { session, isAuthLoading } = useKakaoAuthSession();
@@ -435,6 +465,8 @@ export default function App() {
   const [diagnosisSaved, setDiagnosisSaved] = useState(false);
   const [marketingOptIn, setMarketingOptIn] = useState(true);
   const [authError, setAuthError] = useState<string | null>(null);
+  const [landingCustomerId, setLandingCustomerId] = useState<string | null>(null);
+  const [customerSyncStatus, setCustomerSyncStatus] = useState<CustomerSyncStatus>('idle');
 
   const creatorName = useMemo(
     () => attribution?.creatorDisplayName || formatCreatorName(attribution?.creator),
@@ -448,6 +480,51 @@ export default function App() {
   const isDiagnosisComplete = answeredCount === DIAGNOSIS_QUESTIONS.length;
   const isLoggedIn = Boolean(session);
   const kakaoLoginLabel = isLoggedIn ? '로그인 완료' : isAuthLoading ? '로그인 확인 중' : '카카오 로그인';
+
+  useEffect(() => {
+    if (!supabase || !session) {
+      setLandingCustomerId(null);
+      setCustomerSyncStatus('idle');
+      return;
+    }
+
+    let cancelled = false;
+
+    async function syncLandingCustomer() {
+      const profile = readKakaoProfile(session);
+
+      setCustomerSyncStatus('syncing');
+      const { data, error } = await supabase.rpc('sync_landing_customer', {
+        p_session_id: getSessionId(),
+        p_marketing_opt_in: marketingOptIn,
+        p_creator_id: attribution?.creatorId || null,
+        p_campaign_id: attribution?.campaignId || null,
+        p_display_name: profile.displayName || null,
+        p_email: profile.email || null,
+        p_kakao_user_id: profile.kakaoUserId || null,
+      });
+
+      if (cancelled) {
+        return;
+      }
+
+      if (error || typeof data !== 'string') {
+        setCustomerSyncStatus('failed');
+        setAuthError('로그인은 완료됐지만 고객 정보 연결에 실패했습니다. 잠시 후 다시 시도해 주세요.');
+        return;
+      }
+
+      setLandingCustomerId(data);
+      setCustomerSyncStatus('synced');
+      setAuthError(null);
+    }
+
+    syncLandingCustomer();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [session?.user.id, attribution?.creatorId, attribution?.campaignId, marketingOptIn]);
 
   async function handleKakaoLogin() {
     if (isLoggedIn) {
@@ -487,6 +564,7 @@ export default function App() {
     setIsSavingDiagnosis(true);
     const { error } = await supabase.from('diagnoses').insert({
       session_id: getSessionId(),
+      landing_customer_id: landingCustomerId,
       creator_id: attribution?.creatorId,
       campaign_id: attribution?.campaignId,
       answers,
@@ -648,6 +726,11 @@ export default function App() {
                   {authError && (
                     <p className="mt-4 rounded-xl bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
                       {authError}
+                    </p>
+                  )}
+                  {isLoggedIn && customerSyncStatus !== 'idle' && !authError && (
+                    <p className="mt-4 rounded-xl bg-white/70 px-4 py-3 text-sm font-medium text-[#1A7F5A]">
+                      {customerSyncStatus === 'synced' ? '카카오 고객 정보 연결 완료' : '카카오 고객 정보 연결 중'}
                     </p>
                   )}
                   <button
