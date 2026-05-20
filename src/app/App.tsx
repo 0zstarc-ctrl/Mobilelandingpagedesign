@@ -550,6 +550,23 @@ export default function App() {
     }
   }
 
+  async function handleLogout() {
+    if (!supabase) {
+      return;
+    }
+
+    setAuthError(null);
+    const { error } = await supabase.auth.signOut();
+
+    if (error) {
+      setAuthError('로그아웃 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.');
+      return;
+    }
+
+    setLandingCustomerId(null);
+    setCustomerSyncStatus('idle');
+  }
+
   async function saveDiagnosis(nextAnswers: Record<string, string>) {
     const answers = buildDiagnosisAnswers(nextAnswers);
     const result = getDiagnosisResult(answers);
@@ -600,14 +617,24 @@ export default function App() {
             </div>
             <span className="font-bold text-lg tracking-tight">Pick & Pill</span>
           </div>
-          <button
-            onClick={handleKakaoLogin}
-            disabled={isLoggedIn || isAuthLoading}
-            className="flex items-center gap-1.5 bg-[#FEE500] text-[#371D1E] px-4 py-2 rounded-full text-sm font-semibold hover:bg-[#f4db00] transition-colors disabled:cursor-default disabled:opacity-80"
-          >
-            <MessageCircle className="w-4 h-4 fill-current" />
-            {kakaoLoginLabel}
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleKakaoLogin}
+              disabled={isLoggedIn || isAuthLoading}
+              className="flex items-center gap-1.5 bg-[#FEE500] text-[#371D1E] px-4 py-2 rounded-full text-sm font-semibold hover:bg-[#f4db00] transition-colors disabled:cursor-default disabled:opacity-80"
+            >
+              <MessageCircle className="w-4 h-4 fill-current" />
+              {kakaoLoginLabel}
+            </button>
+            {isLoggedIn && (
+              <button
+                onClick={handleLogout}
+                className="rounded-full border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-600 transition-colors hover:border-gray-300 hover:bg-gray-50"
+              >
+                로그아웃
+              </button>
+            )}
+          </div>
         </div>
       </header>
 
